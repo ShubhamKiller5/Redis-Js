@@ -12,7 +12,7 @@ const server = net.createServer((connection) => {
 server.on("error", (error) => {
      throw error;
 });
-server.listen(8124, "127.0.0.1", () => {
-    console.log("Server is listening on port 8124");
+server.listen(6379, "127.0.0.1", () => {
+    console.log("Server is listening on port 6379");
 });
 
