@@ -1,25 +1,26 @@
-const net = require("node:net");
+const net = require('node:net');
 const map = {};
 const server = net.createServer((connection) => {
-     console.log("client connected");
-     connection.on("end", () => {
-          console.log("Client disconnected");
+     console.log('client connected');
+     connection.on('end', () => {
+          console.log('Client disconnected');
      });
-     connection.on("data", (data) => {
+     connection.on('data', (data) => {
           const message = Buffer.from(data).toString().trim();
-          console.log("messge", message);
+          console.log('messge', message);
           const parsedObject = redisParser(message);
-          console.log("parsedObj", parsedObject);
+
+          console.log('parsedObj', parsedObject);
           const result = redisResponse(
                parsedObject.command,
                parsedObject.commandArg
           );
-          console.log("result", result);
+          console.log('result', result);
           connection.write(result);
      });
      //  connection.pipe(connection);
 });
-server.on("error", (error) => {
+server.on('error', (error) => {
      throw error;
 });
 
@@ -29,7 +30,7 @@ const redisParser = (str = '') => {
           command: '',
           commandArg: [],
      };
-     const strArray = str.split("\r\n");
+     const strArray = str.split('\r\n');
      // const strArray = ['*2', 'get', 'fruit'];
      console.log('array', JSON.stringify(strArray));
      for (const k in strArray) {
@@ -65,12 +66,19 @@ const redisResponse = (command, commandArg) => {
      } else if (command == 'set') {
           const val = commandArg[1];
           const key = commandArg[0];
-          map[key] = val;
-          console.log(map[key])
+          map[key] = {
+               val: val,
+               time: new Date().getTime(),
+               expire: (commandArg[3] && parseInt(commandArg[3])) || null,
+          };
+          console.log(map[key]);
           return `+OK\r\n`;
      } else if (command == 'get') {
+          // map['fruit'] = { val: 'banana', time: 1725539233674, expire: 1000000 };
           const val = map[commandArg[0]];
-          if(val) return respPattern(val);
+          // console.log(new Date().getTime() - val.time)
+          if ((val.expire && val.expire > new Date().getTime() - val.time) || (!val.expire && val))
+               return respPattern(val.val);
           else return respPattern(-1);
      } else {
           return '-ERR unknown command\r\n';
@@ -80,8 +88,7 @@ const redisResponse = (command, commandArg) => {
 const respPattern = (val) => {
      const type = typeof val;
      let ans = null;
-     switch(type)
-     {
+     switch (type) {
           case 'string':
                ans = `$${val.length}\r\n${val}\r\n`;
                break;
@@ -94,4 +101,4 @@ const respPattern = (val) => {
 // const res = redisParser();
 // console.log(res);
 // console.log(redisResponse(res.command, res.commandArg));
-server.listen(6379, "127.0.0.1");
+server.listen(6379, '127.0.0.1');
