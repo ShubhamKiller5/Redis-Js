@@ -3,7 +3,7 @@ const map = {};
 const server = net.createServer((connection) => {
      console.log('client connected');
      connection.on('end', () => {
-          console.log('Client disconnected');
+          console.log('Client disconnected now');
      });
      connection.on('data', (data) => {
           const message = Buffer.from(data).toString().trim();
