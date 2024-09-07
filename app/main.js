@@ -1,4 +1,12 @@
-const net = require('node:net');
+import net from 'node:net';
+import { Constants } from './utils/index.js';
+const config = new Map();
+const [file, dbFileName] = [process.argv[3] ?? null, process.argv[5] ?? null];
+console.log("filearg",file,dbFileName);
+if (file || dbFileName) {
+	config.set('dir', file);
+	config.set('dbfilename', dbFileName);
+}
 const map = {};
 const server = net.createServer((connection) => {
      console.log('client connected');
@@ -6,6 +14,7 @@ const server = net.createServer((connection) => {
           console.log('Client disconnected now');
      });
      connection.on('data', (data) => {
+          console.log('process.argv',process.argv);
           const message = Buffer.from(data).toString().trim();
           console.log('messge', message);
           const parsedObject = redisParser(message);
@@ -31,7 +40,7 @@ const redisParser = (str = '') => {
           commandArg: [],
      };
      const strArray = str.split('\r\n');
-     // const strArray = ['*2', 'get', 'fruit'];
+     // const strArray = ['*2', 'CONFIG GET', 'dbfilename'];
      console.log('array', JSON.stringify(strArray));
      for (const k in strArray) {
           const element = strArray[k];
@@ -77,9 +86,25 @@ const redisResponse = (command, commandArg) => {
           // map['fruit'] = { val: 'banana', time: 1725539233674, expire: 1000000 };
           const val = map[commandArg[0]];
           // console.log(new Date().getTime() - val.time)
-          if ((val.expire && val.expire > new Date().getTime() - val.time) || (!val.expire && val))
+          if (
+               (val.expire && val.expire > new Date().getTime() - val.time) ||
+               (!val.expire && val)
+          )
                return respPattern(val.val);
           else return respPattern(-1);
+     } else if (command === 'config') {
+          if (commandArg[0].toLowerCase() === 'get') {
+               if (commandArg[1].toLowerCase() == 'dir') {
+                    //Return an array
+                    console.log("file",config.get('dir'));
+                    const ans = ['dir', config.get('dir')];
+                    return respPattern(ans);
+               } else if (commandArg[1].toLowerCase() == 'dbfilename') {
+                    console.log('filename',config.get('dbfilename'))
+                    const ans = ['dbFileName', config.get('dbfilename')];
+                    return respPattern(ans);
+               }
+          }
      } else {
           return '-ERR unknown command\r\n';
      }
@@ -94,6 +119,15 @@ const respPattern = (val) => {
                break;
           case 'number':
                ans = `$${val}\r\n`;
+               break;
+          case 'object':
+               if (
+                    Array.isArray(val) &&
+                    val.length === 2 &&
+                    val.every((item) => typeof item === 'string')
+               ) {
+                    ans = `*2\r\n$${val[0].length}\r\n${val[0]}\r\n$${val[1].length}\r\n${val[1]}\r\n`;
+               }
                break;
      }
      return ans;
