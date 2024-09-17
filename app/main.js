@@ -83,12 +83,22 @@ const redisResponse = (command, commandArg) => {
           console.log(map[key]);
           return `+OK\r\n`;
      } else if (command == 'get') {
+          let val;
           // map['fruit'] = { val: 'banana', time: 1725539233674, expire: 1000000 };
-          const val = map[commandArg[0]];
+          if (file || dbFileName) {
+               const filePath = `${config.get('dir')}/${config.get(
+                    'dbfilename'
+               )}`;
+               console.log('commandarg', commandArg);
+               val = parseRdbFile(filePath, true, commandArg[0]);
+          } else {
+               val = map[commandArg[0]];
+          }
+          console.log('val after setting', val);
           // console.log(new Date().getTime() - val.time)
           if (
-               (val.expire && val.expire > new Date().getTime() - val.time) ||
-               (!val.expire && val)
+               (!val.expire && val) ||
+               (val.expire && val.expire > new Date().getTime() - val.time)
           )
                return respPattern(val.val);
           else return respPattern(-1);
@@ -145,7 +155,7 @@ const respPattern = (val) => {
 };
 
 //RDB Parser
-const parseRdbFile = (path) => {
+const parseRdbFile = (path, getData = false, reqKey = null) => {
      console.log('path', path);
      const bufferData = fs.readFileSync(path);
      if (!bufferData) throw new Error('No data exist on given path');
@@ -167,9 +177,8 @@ const parseRdbFile = (path) => {
      //      const valueMetadata = stringEncoding(index, bufferData);
      //      index += valueMetadata.byteRead + valueMetadata.lengthOfString;
      // }
-     console.log("outside fa", index, bufferData.length)
-     while(bufferData[index] !== 0xFE && index<bufferData.length)
-          index++;
+     console.log('outside fa', index, bufferData.length);
+     while (bufferData[index] !== 0xfe && index < bufferData.length) index++;
      //Database section
      while (bufferData[index] === 0xfe) {
           console.log('inside db');
@@ -197,8 +206,22 @@ const parseRdbFile = (path) => {
                index += encodedKeyData.lengthOfString;
 
                let encodedValueData = stringEncoding(index, bufferData);
-               index +=
-                    encodedValueData.byteRead + encodedValueData.lengthOfString;
+               if (getData && reqKey == key) {
+                    index += encodedValueData.byteRead;
+                    const val = bufferData.toString(
+                         'utf8',
+                         index,
+                         index + encodedValueData.lengthOfString
+                    );
+                    return {
+                         val: val,
+                         time: new Date().getTime()
+                    };
+               } else {
+                    index +=
+                         encodedValueData.byteRead +
+                         encodedValueData.lengthOfString;
+               }
 
                if (bufferData[index] === 0xfc) {
                     index += 9; //timestamp in ms hence 8 bytes + 1 byte for FC
@@ -273,7 +296,7 @@ const stringEncoding = (offset, Buffer) => {
           default:
                throw new Error('Invalid string encoding');
      }
-     console.log("resukt",JSON.stringify(result));
+     console.log('resukt', JSON.stringify(result));
      return result;
 };
 // const res = redisParser();
