@@ -97,11 +97,15 @@ const redisResponse = (command, commandArg) => {
           console.log('val after setting', val);
           // console.log(new Date().getTime() - val.time)
           if (
-               (!val.expire && val) ||
-               (val.expire && val.expire > new Date().getTime() - val.time)
-          )
+               val &&
+               (!val.expire ||
+                    (val.expire &&
+                         val.expire > new Date().getTime() - val.time))
+          ) {
                return respPattern(val.val);
-          else return respPattern(-1);
+          } else {
+               return respPattern(-1);
+          }
      } else if (command === 'config') {
           if (commandArg[0].toLowerCase() === 'get') {
                if (commandArg[1].toLowerCase() == 'dir') {
@@ -170,67 +174,94 @@ const parseRdbFile = (path, getData = false, reqKey = null) => {
      //Pass Metadata section
      // while (bufferData[index] === 0xfa) {
      //      index++;
-     //      console.log('0xFA 1');
-     //      const nameMetadata = stringEncoding(index, bufferData); // name of meta data
+     //      const nameMetadata = stringEncoding(index, bufferData);
      //      index += nameMetadata.byteRead + nameMetadata.lengthOfString;
-     //      console.log('0xFA 2');
      //      const valueMetadata = stringEncoding(index, bufferData);
      //      index += valueMetadata.byteRead + valueMetadata.lengthOfString;
      // }
-     console.log('outside fa', index, bufferData.length);
-     while (bufferData[index] !== 0xfe && index < bufferData.length) index++;
+     while (index < bufferData.length && bufferData[index] !== 0xfe) {
+          index++;
+     }
+
      //Database section
-     while (bufferData[index] === 0xfe) {
-          console.log('inside db');
-          index++; //Start of DB section
-          index += stringEncoding(index, bufferData).byteRead; //Database index
+     while (index < bufferData.length && bufferData[index] !== 0xff) {
+          console.log('Inside db');
+          if (bufferData[index] === 0xfe) {
+               index++; //Start of DB section
+               console.log('Database index start');
+               index += stringEncoding(index, bufferData).byteRead; //Database index
+               console.log('Db index finish');
+          }
 
           if (bufferData[index] === 0xfb) {
                index++;
+               console.log('hash table size start');
                index += stringEncoding(index, bufferData).byteRead; // pass hash table size
+               console.log('hash table size finish');
+               console.log('expiry size start');
                index += stringEncoding(index, bufferData).byteRead; //pass expiry size
+               console.log('expiry size finish');
           }
-          console.log('after fb');
-          while (bufferData[index] !== 0xff && index < bufferData.length) {
-               index++; //1byte flag
-               let encodedKeyData = stringEncoding(index, bufferData);
-               index += encodedKeyData.byteRead; //As that will be to figure out the length of key
 
-               let key = bufferData.toString(
-                    'utf8',
-                    index,
-                    index + encodedKeyData.lengthOfString
-               );
-               keys.push(key);
+          // Key-Value pair
+          let expiry = null;
+          if (bufferData[index] === 0xfc) {
+               console.log('ms expiry');
+               index++;
+               expiry = bufferData.readBigUInt64LE(index);
+               index += 8;
+          } else if (bufferData[index] === 0xfd) {
+               console.log('s expiry');
+               index++;
+               expiry = bufferData.readUInt32LE(index);
+               index += 4;
+          }
+          let flag = bufferData[index];
+          console.log('flag', flag);
+          index++; //flag
 
-               index += encodedKeyData.lengthOfString;
+          console.log('keys fetch start');
+          let encodedKeyData = stringEncoding(index, bufferData);
+          console.log('encodedKeyData', encodedKeyData);
+          index += encodedKeyData.byteRead;
+          let key = bufferData.toString(
+               'utf8',
+               index,
+               index + encodedKeyData.lengthOfString
+          );
+          index += encodedKeyData.lengthOfString;
+          keys.push(key);
+          console.log('keys fetch finish', { key });
 
-               let encodedValueData = stringEncoding(index, bufferData);
-               if (getData && reqKey == key) {
-                    index += encodedValueData.byteRead;
-                    const val = bufferData.toString(
-                         'utf8',
-                         index,
-                         index + encodedValueData.lengthOfString
-                    );
-                    return {
-                         val: val,
-                         time: new Date().getTime()
-                    };
+          console.log('values fetch start');
+          let encodedValueData = stringEncoding(index, bufferData);
+          console.log('encodedValueData', encodedValueData);
+          index += encodedValueData.byteRead;
+          let value = bufferData.toString(
+               'utf8',
+               index,
+               index + encodedValueData.lengthOfString
+          );
+          index += encodedValueData.lengthOfString;
+          console.log('values fetch finish', { value });
+
+          console.log('Checking the value requirement', getData, expiry, {
+               key,
+               reqKey,
+          });
+          if (getData && key === reqKey) {
+               const currentTime = new Date().getTime();
+               console.log('timesatamps', currentTime, expiry);
+               if (!expiry || expiry > currentTime) {
+                    return { val: value, time: currentTime, expire: expiry };
                } else {
-                    index +=
-                         encodedValueData.byteRead +
-                         encodedValueData.lengthOfString;
-               }
-
-               if (bufferData[index] === 0xfc) {
-                    index += 9; //timestamp in ms hence 8 bytes + 1 byte for FC
-               } else if (bufferData[index] === 0xfd) {
-                    index += 5; //timestamp in s hence 4 bytes + 1 byte for FC
+                    return null; // Key has expired
                }
           }
      }
-     console.log('keys', JSON.stringify(keys));
+
+     if (getData) return null;
+     console.log('keys final', JSON.stringify(keys));
      return keys;
 };
 
@@ -247,55 +278,100 @@ const parseRdbFile = (path, getData = false, reqKey = null) => {
    The size is the next 4 bytes, in big-endian (read left-to-right).*/
 
 const stringEncoding = (offset, Buffer) => {
+     // console.log('byte', Buffer.toString('utf8', offset));
      const firstByte = Buffer[offset];
+     console.log('firstByte', firstByte);
      const twoMostSignificantBits = firstByte >> 6;
      let result;
-     console.log('twoMostSignificantBits', twoMostSignificantBits);
-     switch (twoMostSignificantBits) {
-          case 0:
-               result = { lengthOfString: firstByte & 0x3f, byteRead: 1 };
-               break;
-          case 1:
-               let nextByte = Buffer[offset + 1];
-               result = {
-                    lengthOfString: ((firstByte & 0x3f) << 8) | nextByte,
-                    byteRead: 2,
+     console.log(
+          'twoMostSignificantBits',
+          twoMostSignificantBits,
+          twoMostSignificantBits == 2
+     );
+     if (twoMostSignificantBits == 0) {
+          return { lengthOfString: firstByte & 0x3f, byteRead: 1 };
+     } else if (twoMostSignificantBits == 1) {
+          let nextByte = Buffer[offset + 1];
+          console.log(
+               'nextByte',
+               { nextByte },
+               ((firstByte & 0b00111111) << 8) | nextByte
+          );
+          return {
+               lengthOfString: ((firstByte & 0x3f) << 8) | nextByte,
+               byteRead: 2,
+          };
+     } else if (twoMostSignificantBits == 2) {
+          return {
+               lengthOfString: Buffer.readUInt32LE(offset + 1),
+               byteRead: 5,
+          };
+     } else {
+          const specialEncoding = firstByte & 0x3f;
+          console.log('specialEncoding', specialEncoding);
+          if (specialEncoding === 0) {
+               return { lengthOfString: Buffer[offset + 1], byteRead: 2 };
+          } else if (specialEncoding === 1) {
+               return {
+                    lengthOfString: Buffer.readUInt16LE(offset + 1),
+                    byteRead: 3,
                };
-               break;
-          case 2:
-               result = {
-                    lengthOfString: Buffer.readUInt32BE(offset + 1),
+          } else if (specialEncoding === 2) {
+               return {
+                    lengthOfString: Buffer.readUInt32LE(offset + 1),
                     byteRead: 5,
                };
-          case 3:
-               // Handle special encoding
-               if ((firstByte & 0x3f) === 0) {
-                    // 8-bit integer
-                    result = {
-                         lengthOfString: Buffer[offset + 1],
-                         byteRead: 2,
-                    };
-               } else if ((firstByte & 0x3f) === 1) {
-                    // 16-bit integer
-                    result = {
-                         lengthOfString: Buffer.readUInt16BE(offset + 1),
-                         byteRead: 3,
-                    };
-               } else if ((firstByte & 0x3f) === 2) {
-                    // 32-bit integer
-                    result = {
-                         lengthOfString: Buffer.readUInt32BE(offset + 1),
-                         byteRead: 5,
-                    };
-               } else {
-                    throw new Error(
-                         `Unhandled special encoding: ${firstByte & 0x3f}`
-                    );
-               }
-               break;
-          default:
-               throw new Error('Invalid string encoding');
+          } else {
+               return { lengthOfString: specialEncoding - 1, byteRead: 1 };
+          }
      }
+     // switch (twoMostSignificantBits) {
+     //      case 0:
+     //           result = { lengthOfString: firstByte & 0x3f, byteRead: 1 };
+     //           break;
+     //      case 1:
+     //           let nextByte = Buffer[offset + 1];
+     //           result = {
+     //                lengthOfString: ((firstByte & 0x3f) << 8) | nextByte,
+     //                byteRead: 2,
+     //           };
+     //           break;
+     //      case 2:
+     //           result = {
+     //                lengthOfString: Buffer.readUInt32LE(offset + 1),
+     //                byteRead: 5,
+     //           };
+     //      case 3:
+     //           // Handle special encoding
+     //           const intersect = firstByte & 0x3f;
+     //           console.log('intersect', intersect);
+     //           if ((firstByte & 0x3f) === 0) {
+     //                // 8-bit integer
+     //                result = {
+     //                     lengthOfString: Buffer[offset + 1],
+     //                     byteRead: 2,
+     //                };
+     //           } else if ((firstByte & 0x3f) === 1) {
+     //                // 16-bit integer
+     //                result = {
+     //                     lengthOfString: Buffer.readUInt16LE(offset + 1),
+     //                     byteRead: 3,
+     //                };
+     //           } else if ((firstByte & 0x3f) === 2) {
+     //                // 32-bit integer
+     //                result = {
+     //                     lengthOfString: Buffer.readUInt32LE(offset + 1),
+     //                     byteRead: 5,
+     //                };
+     //           } else {
+     //                throw new Error(
+     //                     `Unhandled special encoding: ${firstByte & 0x3f}`
+     //                );
+     //           }
+     //           break;
+     //      default:
+     //           throw new Error('Invalid string encoding');
+     // }
      console.log('resukt', JSON.stringify(result));
      return result;
 };
