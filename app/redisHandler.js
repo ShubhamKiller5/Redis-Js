@@ -54,6 +54,8 @@ const handleInfo = (commandArg) => {
      if (config.get('isReplica')) {
           info = 'role:slave';
      } else info = 'role:master';
+
+     info += '\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0'
      return respPattern(info);
 };
 
