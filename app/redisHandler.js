@@ -8,6 +8,13 @@ export const redisParser = (str = '') => {
      };
      const strArray = str.split('\r\n').filter((element) => element[0] !== '$');
      const totalArgs = strArray[0][1];
+     console.log('strArray', strArray);
+     if (strArray[1].includes('-')) {
+          parsedObject['command'] = strArray[3];
+          parsedObject['commandArg'] = strArray.slice(4);
+          parsedObject['commandArg'].push(strArray[2]);
+          return parsedObject;
+     }
      parsedObject['command'] = strArray[1];
      if (totalArgs == '*1') {
           parsedObject['commandArg'] = null;
@@ -42,7 +49,11 @@ export const redisResponse = (command, commandArg) => {
 };
 
 const handleInfo = (commandArg) => {
-     const info = 'role:master';
+     const port = commandArg[commandArg.length - 1];
+     let info = '';
+     if (config.get('isReplica')) {
+          info = 'role:slave';
+     } else info = 'role:master';
      return respPattern(info);
 };
 
