@@ -9,7 +9,7 @@ export const redisParser = (str = '') => {
      const strArray = str.split('\r\n').filter((element) => element[0] !== '$');
      const totalArgs = strArray[0][1];
      console.log('strArray', strArray);
-     if (strArray[1].includes('-')) {
+     if (strArray[1]?.includes('-')) {
           parsedObject['command'] = strArray[3];
           parsedObject['commandArg'] = strArray.slice(4);
           parsedObject['commandArg'].push(strArray[2]);
@@ -103,7 +103,7 @@ const handleKeys = (commandArg) => {
      }
 };
 
-const respPattern = (val) => {
+export const respPattern = (val) => {
      const type = typeof val;
      let ans = null;
      switch (type) {
