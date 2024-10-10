@@ -1,12 +1,20 @@
 import net from 'node:net';
 import { redisParser, redisResponse } from './redisHandler.js';
 import { config } from './config.js';
-import { RedisReplica } from './replica.js';
+import { RedisMaster } from './replica.js';
 
 if (config.get('isReplica')) {
-    console.log("here for replica",config.get('masterHost'),config.get('masterPort'))
-    const masterRedis = new RedisReplica(config.get('masterHost'),config.get('masterPort'));
-    masterRedis.connect();
+     console.log(
+          'here for replica',
+          config.get('masterHost'),
+          config.get('masterPort')
+     );
+     const masterRedis = new RedisMaster(
+          config.get('masterHost'),
+          config.get('masterPort')
+     );
+     //Connect and recieve ping from replica
+     masterRedis.connect();
 }
 
 const server = net.createServer((connection) => {

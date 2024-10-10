@@ -43,9 +43,15 @@ export const redisResponse = (command, commandArg) => {
                return handleKeys(commandArg);
           case 'info':
                return handleInfo(commandArg);
+          case 'replconf':
+               return handleReplicaConfig();
           default:
                return '-ERR unknown command\r\n';
      }
+};
+
+const handleReplicaConfig = () => {
+     return respPattern('+OK');
 };
 
 const handleInfo = (commandArg) => {
@@ -55,7 +61,8 @@ const handleInfo = (commandArg) => {
           info = 'role:slave';
      } else info = 'role:master';
 
-     info += '\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0'
+     info +=
+          '\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0';
      return respPattern(info);
 };
 

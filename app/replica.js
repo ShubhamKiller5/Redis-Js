@@ -1,7 +1,7 @@
 import { redisParser, redisResponse } from './redisHandler.js';
 import net from 'node:net';
 
-export class RedisReplica {
+export class RedisMaster {
      constructor(masterHost,masterPort) {
           this.host = masterHost
           this.port = masterPort
@@ -48,5 +48,14 @@ export class RedisReplica {
           } catch (error) {
                throw error;
           }
+     }
+
+     async receiveConfig(){
+        try {
+            await this.connection.write('*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n');
+            await this.connection.write('*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n');
+        } catch (error) {
+            throw error;
+        }
      }
 }
