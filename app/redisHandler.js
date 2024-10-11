@@ -45,9 +45,17 @@ export const redisResponse = (command, commandArg) => {
                return handleInfo(commandArg);
           case 'replconf':
                return handleReplicaConfig();
+          case 'psync':
+               return handlePsync();
           default:
                return '-ERR unknown command\r\n';
      }
+};
+
+const handlePsync = () => {
+     return respPattern(
+          'FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0'
+     );
 };
 
 const handleReplicaConfig = () => {
