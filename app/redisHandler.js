@@ -51,7 +51,7 @@ export const redisResponse = (command, commandArg) => {
 };
 
 const handleReplicaConfig = () => {
-     return respPattern('+OK');
+     return respPattern('OK');
 };
 
 const handleInfo = (commandArg) => {
