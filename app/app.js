@@ -1,7 +1,7 @@
 import net from 'node:net';
 import { redisParser, redisResponse } from './redisHandler.js';
 import { config } from './config.js';
-import { RedisMaster } from './replica.js';
+import { RedisMaster } from './replica.js'
 
 if (config.get('isReplica')) {
      console.log(
