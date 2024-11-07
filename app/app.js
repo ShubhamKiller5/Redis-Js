@@ -53,7 +53,11 @@ const server = net.createServer((connection) => {
                     'UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==';
                const rdbBuffer = Buffer.from(base64, 'base64');
                const rdbHead = Buffer.from(`$${rdbBuffer.length}\r\n`);
-               connection.write(Buffer.concat([rdbHead, rdbBuffer]));
+              connection.write(Buffer.concat([rdbHead, rdbBuffer]));
+              if (!config.get('replicaConnections')) {
+                   config.set('replicaConnections', []);
+              }
+              config.get('replicaConnections').push(connection);
           }
      });
 });

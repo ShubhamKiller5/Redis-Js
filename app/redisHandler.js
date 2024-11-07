@@ -75,12 +75,20 @@ const handleInfo = (commandArg) => {
 };
 
 const handleSet = (commandArg) => {
-     const [key, val, , expire] = commandArg;
+     const [key, val, px, expire] = commandArg;
      map[key] = {
           val: val,
           time: new Date().getTime(),
           expire: expire ? parseInt(expire) : null,
      };
+    
+    if (!config.get('isReplica')) {
+         let replicaConnections = config.get('replicaConnections');
+         replicaConnections?.forEach((connection) => {
+              let message = respPattern(['SET', ...commandArg]);
+              connection.write(message);
+         });
+    }
      return '+OK\r\n';
 };
 
@@ -92,7 +100,7 @@ const handleGet = (commandArg) => {
      } else {
           val = map[commandArg[0]];
      }
-
+console.log('value', val);
      if (val && (!val.expire || val.expire > new Date().getTime() - val.time)) {
           return respPattern(val.val);
      } else {
