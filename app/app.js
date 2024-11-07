@@ -9,28 +9,28 @@ if (config.get('isReplica')) {
           config.get('masterHost'),
           config.get('masterPort')
      );
-     const masterRedis = new RedisMaster(
+     const replicaRedis = new RedisMaster(
           config.get('masterHost'),
           config.get('masterPort'),
           config.get('port')
      );
      //Connect and recieve ping from replica
-     await masterRedis.connect();
+     await replicaRedis.connect();
 
      console.log('Sending PING');
-     const pingResponse = await masterRedis.sendPing();
+     const pingResponse = await replicaRedis.sendPing();
      console.log('PING response:', pingResponse);
 
      console.log('Sending REPLCONF listening-port');
-     const portResponse = await masterRedis.sendListeningPort();
+     const portResponse = await replicaRedis.sendListeningPort();
      console.log('REPLCONF listening-port response:', portResponse);
 
      console.log('Sending REPLCONF capa psync2');
-     const capaResponse = await masterRedis.sendCapa();
+     const capaResponse = await replicaRedis.sendCapa();
      console.log('REPLCONF capa psync2 response:', capaResponse);
 
      console.log('Sending psync command');
-     const psyncResp = await masterRedis.sendPsync();
+     const psyncResp = await replicaRedis.sendPsync();
      console.log('Psync response:', psyncResp);
      console.log('Handshake completed');
 }
