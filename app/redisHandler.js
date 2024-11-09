@@ -3,7 +3,7 @@ import { parseRdbFile } from './rdbParser.js';
 
 export const redisParser = (str = '') => {
      const parsedObject = {
-          command: '',
+          command: [],
           commandArg: [],
      };
      const strArray = str.split('\r\n').filter((element) => element[0] !== '$');
@@ -15,12 +15,20 @@ export const redisParser = (str = '') => {
           parsedObject['commandArg'].push(strArray[2]);
           return parsedObject;
      }
-     parsedObject['command'] = strArray[1];
-     if (totalArgs == '*1') {
-          parsedObject['commandArg'] = null;
-          return parsedObject;
+     for (let i = 0; i < strArray.length - 3; i += 4) {
+          parsedObject['command'].push(strArray[i + 1]);
+          if (totalArgs == '*1') {
+               parsedObject['commandArg'] = null;
+               return parsedObject;
+          }
+          parsedObject['commandArg'].push(strArray.slice(i + 2, i + 4));
      }
-     parsedObject['commandArg'] = strArray.slice(2);
+     //  parsedObject['command'] = strArray[1];
+     //  if (totalArgs == '*1') {
+     //       parsedObject['commandArg'] = null;
+     //       return parsedObject;
+     //  }
+     //  parsedObject['commandArg'] = strArray.slice(2, 4);
      return parsedObject;
 };
 
@@ -81,26 +89,29 @@ const handleSet = (commandArg) => {
           time: new Date().getTime(),
           expire: expire ? parseInt(expire) : null,
      };
-    
-    if (!config.get('isReplica')) {
-         let replicaConnections = config.get('replicaConnections');
-         replicaConnections?.forEach((connection) => {
-              let message = respPattern(['SET', ...commandArg]);
-              connection.write(message);
-         });
-    }
+
+     if (!config.get('isReplica')) {
+          let replicaConnections = config.get('replicaConnections');
+          replicaConnections?.forEach((connection) => {
+               let message = respPattern(['SET', ...commandArg]);
+               connection.write(message);
+          });
+     }
      return '+OK\r\n';
 };
 
 const handleGet = (commandArg) => {
      let val;
-     if (config.get('dir') || config.get('dbfilename')) {
+     if (
+          !config.get('isReplica') &&
+          (config.get('dir') || config.get('dbfilename'))
+     ) {
           const filePath = `${config.get('dir')}/${config.get('dbfilename')}`;
           val = parseRdbFile(filePath, true, commandArg[0]);
      } else {
           val = map[commandArg[0]];
      }
-console.log('value', val);
+     console.log('value', val);
      if (val && (!val.expire || val.expire > new Date().getTime() - val.time)) {
           return respPattern(val.val);
      } else {

@@ -15,7 +15,8 @@ if (config.get('isReplica')) {
           config.get('port')
      );
      //Connect and recieve ping from replica
-     await replicaRedis.connect();
+    await replicaRedis.connect();
+    console.log('Replica established');
 
      console.log('Sending PING');
      const pingResponse = await replicaRedis.sendPing();
