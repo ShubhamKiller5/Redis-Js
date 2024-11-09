@@ -5,7 +5,7 @@
     "main": "main.js",
     "type": "module",
     "scripts": {
-        "dev": "node app/main.js"
+        "dev": "node app/app.js"
     },
     "keywords": [
         "build-your-own-x"
