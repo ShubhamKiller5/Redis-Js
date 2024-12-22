@@ -43,23 +43,42 @@ const server = net.createServer((connection) => {
      });
      connection.on('data', (data) => {
           const message = Buffer.from(data).toString().trim();
-          const parsedObject = redisParser(message);
-          const result = redisResponse(
-               parsedObject.command,
-               parsedObject.commandArg
-          );
-          connection.write(result);
-          if (parsedObject.command.toLowerCase() === 'psync') {
-               const base64 =
-                    'UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==';
-               const rdbBuffer = Buffer.from(base64, 'base64');
-               const rdbHead = Buffer.from(`$${rdbBuffer.length}\r\n`);
-              connection.write(Buffer.concat([rdbHead, rdbBuffer]));
-              if (!config.get('replicaConnections')) {
-                   config.set('replicaConnections', []);
-              }
-              config.get('replicaConnections').push(connection);
+         const parsedObject = redisParser(message);
+         console.log('parsed obj', JSON.stringify(parsedObject));
+          for (let i = 0; i < parsedObject.command.length; i++) {
+               const command = parsedObject.command[i];
+               const commandArg = parsedObject.commandArg[i];
+               const result = redisResponse(command, commandArg);
+               console.log('redis result', result);
+               connection.write(result);
+               if (command.toLowerCase() === 'psync') {
+                    const base64 =
+                         'UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==';
+                    const rdbBuffer = Buffer.from(base64, 'base64');
+                    const rdbHead = Buffer.from(`$${rdbBuffer.length}\r\n`);
+                    connection.write(Buffer.concat([rdbHead, rdbBuffer]));
+                    if (!config.get('replicaConnections')) {
+                         config.set('replicaConnections', []);
+                    }
+                    config.get('replicaConnections').push(connection);
+               }
           }
+          //   const result = redisResponse(
+          //        parsedObject.command,
+          //        parsedObject.commandArg
+          //   );
+          //   connection.write(result);
+          //   if (parsedObject.command.toLowerCase() === 'psync') {
+          //        const base64 =
+          //             'UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==';
+          //        const rdbBuffer = Buffer.from(base64, 'base64');
+          //        const rdbHead = Buffer.from(`$${rdbBuffer.length}\r\n`);
+          //       connection.write(Buffer.concat([rdbHead, rdbBuffer]));
+          //       if (!config.get('replicaConnections')) {
+          //            config.set('replicaConnections', []);
+          //       }
+          //       config.get('replicaConnections').push(connection);
+          //   }
      });
 });
 

@@ -1,5 +1,6 @@
 import net from 'node:net';
 import { redisParser, redisResponse } from './redisHandler.js';
+import { resolve } from 'node:path';
 
 export class RedisMaster {
      constructor(masterHost, masterPort, replicaPort) {
@@ -8,6 +9,8 @@ export class RedisMaster {
           this.replicaPort = replicaPort;
           this.connection = null;
           this.pendingCommand = null;
+          this.commandQueue = [];
+          this.processingCommand = false;
      }
 
      async connect() {
@@ -29,7 +32,30 @@ export class RedisMaster {
           });
      }
 
-     handleResponse(data) {
+     async handleMessage() {
+          console.log('At handle message function');
+          if (this.pendingCommand) return;
+          this.pendingCommand = true;
+          console.log('Going inside the command queue');
+          while (this.commandQueue.length) {
+               const parsedCommandObject = this.commandQueue.shift();
+               console.log(
+                    'parsedCommandObject',
+                    JSON.stringify(parsedCommandObject)
+               );
+               for (let i = 0; i < parsedCommandObject.command.length; i++) {
+                    const command = parsedCommandObject.command[i];
+                    const commandArg = parsedCommandObject.commandArg[i];
+                    const result = redisResponse(command, commandArg);
+                    console.log('redis result', result);
+                    this.connection.write(result);
+               }
+               await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          this.pendingCommand = false;
+     }
+
+     async handleResponse(data) {
           if (this.pendingCommand && data.includes('\r\n')) {
                const response = data.slice(0, data.indexOf('\r\n'));
                this.pendingCommand.resolve(response);
@@ -39,14 +65,9 @@ export class RedisMaster {
                const message = Buffer.from(data).toString().trim();
                let parsedObject = redisParser(message);
 
-               console.log('parsed obj', JSON.stringify(parsedObject));
-               for (let i = 0; i < parsedObject.command.length; i++) {
-                    const command = parsedObject.command[i];
-                    const commandArg = parsedObject.commandArg[i];
-                    const result = redisResponse(command, commandArg);
-                    console.log('redis result', result);
-                    this.connection.write(result);
-               }
+               console.log('parsed obj replica', JSON.stringify(parsedObject));
+               this.commandQueue.push(parsedObject);
+               await this.handleMessage();
           }
      }
 

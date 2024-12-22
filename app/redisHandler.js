@@ -4,38 +4,69 @@ import { parseRdbFile } from './rdbParser.js';
 export const redisParser = (str = '') => {
      const parsedObject = {
           command: [],
-          commandArg: [],
+         commandArg: [],
      };
      const strArray = str.split('\r\n').filter((element) => element[0] !== '$');
-     const totalArgs = strArray[0][1];
+     //  const totalArgs = strArray[0][1];
      console.log('strArray', strArray);
-     if (strArray[1]?.includes('-')) {
-          parsedObject['command'] = strArray[3];
-          parsedObject['commandArg'] = strArray.slice(4);
-          parsedObject['commandArg'].push(strArray[2]);
-          return parsedObject;
-     }
-     for (let i = 0; i < strArray.length - 3; i += 4) {
-          parsedObject['command'].push(strArray[i + 1]);
-          if (totalArgs == '*1') {
-               parsedObject['commandArg'] = null;
-               return parsedObject;
-          }
-          parsedObject['commandArg'].push(strArray.slice(i + 2, i + 4));
-     }
+    //  if (strArray[1]?.includes('-')) {
+    //       parsedObject['command'] = strArray[3];
+    //       parsedObject['commandArg'] = strArray.slice(4);
+    //       parsedObject['commandArg'].push(strArray[2]);
+    //       return parsedObject;
+    //  }
+
+    let indexOfLengthOfCommand = 0,lenInd = 0;
+    console.log('Going inside the while')
+    while (lenInd < strArray.length)
+    {
+        let initial = lenInd;
+        indexOfLengthOfCommand = Number(strArray[lenInd][1]);
+        console.log("indexOfLengthOfCommand", indexOfLengthOfCommand, typeof indexOfLengthOfCommand);
+        if (typeof indexOfLengthOfCommand != 'number') return parsedObject;
+
+        let newArr = strArray.slice(initial + 1, lenInd + indexOfLengthOfCommand + 1);
+        console.log('Initialise the new array', JSON.stringify(newArr));
+        const commandArg = []
+        for (let i = 0; i < indexOfLengthOfCommand; i++)
+        {
+            if (i == 0)
+            {
+                parsedObject['command'].push(newArr[i]);
+                continue;
+            }
+            commandArg.push(newArr[i]);
+        }
+        parsedObject['commandArg'].push(commandArg)
+        lenInd+=4;
+        console.log("lenInd",lenInd)
+    }
+    //Uncomment the for loop
+    //  for (let i = 0; i < strArray.length; i += 4) {
+    //       const totalArgs = strArray[i];
+    //       console.log('totalArgs', totalArgs);
+    //       parsedObject['command'].push(strArray[i + 1]);
+    //       if (totalArgs == '*1') {
+    //            parsedObject['commandArg'] = null;
+    //            return parsedObject;
+    //       }
+    //       parsedObject['commandArg'].push(strArray.slice(i + 2, i + 4));
+    //  }
+
      //  parsedObject['command'] = strArray[1];
      //  if (totalArgs == '*1') {
      //       parsedObject['commandArg'] = null;
      //       return parsedObject;
      //  }
-     //  parsedObject['commandArg'] = strArray.slice(2, 4);
+    //  parsedObject['commandArg'] = strArray.slice(2, 4);
+    console.log(parsedObject)
      return parsedObject;
 };
 
 export const redisResponse = (command, commandArg) => {
      if (!command || command == undefined) return '-ERR unknown command\r\n';
      command = command.toLowerCase();
-
+    console.log({commandArg})
      switch (command) {
           case 'echo':
                return respPattern(commandArg.join(' '));
